@@ -97,9 +97,8 @@ jobs:
           echo "::set-output name=status::success"
 
       - name: UPX
-        if: !env.ASSET_NAME == 'linux-mips64le' && !env.ASSET_NAME == 'linux-mips64' && !cancelled()
         id: upx
-        if: steps.compile.outputs.status == 'success' && !cancelled()
+        if: steps.compile.outputs.status == 'success' && !cancelled() && !env.ASSET_NAME == 'linux-mips64le' && !env.ASSET_NAME == 'linux-mips64'
         run: |
           cd Xray
           upx --lzma --best build_assets/xray || true
@@ -159,12 +158,12 @@ jobs:
         uses: GitRML/delete-workflow-runs@main
         with:
           retain_days: 1
-          keep_minimum_runs: 10
+          keep_minimum_runs: 6
 
       - name: Remove old Releases
         uses: dev-drprasad/delete-older-releases@v0.1.0
         with:
-          keep_latest: 15
+          keep_latest: 6
           delete_tags: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
