@@ -1,0 +1,171 @@
+name: Release
+
+on:
+  repository_dispatch:
+  release:
+    types: published
+  push:
+    branches:
+      - master
+    paths:
+      - 'start'
+  schedule:
+    - cron: 0 */6 * * *
+
+env:
+  REPO_URL: https://github.com/XTLS/Xray-core
+  REPO_BRANCH: main
+  DIY_P1_SH: diy.sh
+  DIY_P2_SH: after_build.sh
+  UPLOAD_BIN_DIR: false
+  SSH_ACTIONS: false
+  UPLOAD_PUSH: false
+  UPLOAD_COWTRANSFER: true
+  UPLOAD_WETRANSFER: true
+  UPLOAD_RELEASE: true
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        goos: [freebsd, openbsd, linux]
+        goarch: [amd64, 386]
+        include:
+          # BEGIN Linux ARM 5 6 7
+          - goos: linux
+            goarch: arm
+            goarm: 7
+          - goos: linux
+            goarch: arm
+            goarm: 6
+          - goos: linux
+            goarch: arm
+            goarm: 5
+          # END Linux ARM 5 6 7
+          # BEGIN Other architectures
+          - goos: linux
+            goarch: arm64
+          - goos: linux
+            goarch: riscv64
+          # BEGIN MIPS
+          - goos: linux
+            goarch: mips64
+          - goos: linux
+            goarch: mips64le
+          - goos: linux
+            goarch: mipsle
+          - goos: linux
+            goarch: mips
+          # END MIPS
+      fail-fast: false
+
+    runs-on: ubuntu-latest
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+      GOARM: ${{ matrix.goarm }}
+      CGO_ENABLED: 0
+
+    steps:
+      - name: Checkout codebase
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Show workflow information
+        id: get_filename
+        run: |
+          export _NAME=$(jq ".[\"$GOOS-$GOARCH$GOARM\"].friendlyName" -r < release/friendly-filenames.json)
+          echo "GOOS: $GOOS, GOARCH: $GOARCH, GOARM: $GOARM, RELEASE_NAME: $_NAME"
+          echo "::set-output name=ASSET_NAME::$_NAME"
+          echo "ASSET_NAME=$_NAME" >> $GITHUB_ENV
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.15
+
+      - name: Get project dependencies
+        run: |
+          git clone $REPO_URL -b $REPO_BRANCH Xray
+          cd Xray && go mod download
+          
+      - name: Build XRay
+        id: compile
+        run: |
+          cd Xray
+          mkdir -p build_assets
+          go build -v -o build_assets/xray -trimpath -ldflags "-s -w -buildid=" ./main
+          echo "::set-output name=status::success"
+
+      - name: UPX
+        id: upx
+        if: steps.compile.outputs.status == 'success' && !cancelled()
+        run: |
+          cd Xray
+          upx --lzma --best build_assets/xray || true
+          echo "::set-output name=status::success"
+
+      - name: Create ZIP archive
+        if: steps.upx.outputs.status == 'success' && !cancelled()
+        run: |
+          cd Xray
+          pushd build_assets || exit 1
+          zip -9vr ../xray-$ASSET_NAME.zip .
+          popd || exit 1
+          FILE=./xray-$ASSET_NAME.zip
+          DGST=$FILE.dgst
+          openssl dgst -md5    $FILE | sed 's/([^)]*)//g' >>$DGST
+          openssl dgst -sha1   $FILE | sed 's/([^)]*)//g' >>$DGST
+          openssl dgst -sha256 $FILE | sed 's/([^)]*)//g' >>$DGST
+          openssl dgst -sha512 $FILE | sed 's/([^)]*)//g' >>$DGST
+          cp -u -f xray-${{ steps.get_filename.outputs.ASSET_NAME }}.zip ../
+
+      - name: Generate release tag
+        id: tag
+        if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+        run: |
+          echo "::set-output name=release_tag::$(TZ='Asia/Shanghai' date +"%Y.%m.%d-%H")"
+          touch release.txt
+          echo "::set-output name=status::success"
+
+      - name: Upload ZIP file to Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: xray-${{ steps.get_filename.outputs.ASSET_NAME }}.zip
+          path: Xray/xray-${{ steps.get_filename.outputs.ASSET_NAME }}.zip
+
+      - name: git push
+        if: env.UPLOAD_PUSH == 'true' && !cancelled()
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git pull origin master
+          git add xray-${{ steps.get_filename.outputs.ASSET_NAME }}.zip
+          git commit -am "update ${{ steps.get_filename.outputs.ASSET_NAME }} $(TZ='Asia/Shanghai' date +@%Y%m%d)"
+          git push -v --progress
+
+      - name: Release and Upload Assets
+        uses: softprops/action-gh-release@v1
+        if: steps.tag.outputs.status == 'success' && !cancelled()
+        with:
+          tag_name: ${{ steps.tag.outputs.release_tag }}
+          body_path: release.txt
+          files: |
+            Xray/xray-*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete workflow runs
+        uses: GitRML/delete-workflow-runs@main
+        with:
+          retain_days: 1
+          keep_minimum_runs: 10
+
+      - name: Remove old Releases
+        uses: dev-drprasad/delete-older-releases@v0.1.0
+        with:
+          keep_latest: 15
+          delete_tags: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
