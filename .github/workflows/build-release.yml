@@ -125,7 +125,7 @@ jobs:
         id: tag
         if: env.UPLOAD_RELEASE == 'true' && !cancelled()
         run: |
-          echo "::set-output name=release_tag::$(TZ='Asia/Shanghai' date +"%Y.%m.%d-%H")"
+          echo "::set-output name=release_tag::$(TZ='Asia/Shanghai' date +"%Y.%m.%d-%H")-$(git rev-parse --short HEAD)"
           touch release.txt
           echo "::set-output name=status::success"
 
