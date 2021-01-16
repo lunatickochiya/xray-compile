@@ -10,7 +10,7 @@ on:
     paths:
       - 'start'
   schedule:
-    - cron: 0 */5 * * *
+    - cron: 0 */9 * * *
 
 env:
   REPO_URL: https://github.com/XTLS/Xray-core
@@ -28,7 +28,7 @@ jobs:
   build:
     strategy:
       matrix:
-        goos: [freebsd, openbsd, linux]
+        goos: [linux]
         goarch: [amd64, 386]
         include:
           # BEGIN Linux ARM 5 6 7
@@ -45,8 +45,6 @@ jobs:
           # BEGIN Other architectures
           - goos: linux
             goarch: arm64
-          - goos: linux
-            goarch: riscv64
           # BEGIN MIPS
           - goos: linux
             goarch: mips64
@@ -99,6 +97,7 @@ jobs:
           echo "::set-output name=status::success"
 
       - name: UPX
+        if: !env.ASSET_NAME == 'linux-mips64le' && !env.ASSET_NAME == 'linux-mips64' && !cancelled()
         id: upx
         if: steps.compile.outputs.status == 'success' && !cancelled()
         run: |
