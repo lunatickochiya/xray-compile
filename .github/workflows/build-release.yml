@@ -98,7 +98,7 @@ jobs:
 
       - name: UPX
         id: upx
-        if: steps.compile.outputs.status == 'success' && env.ASSET_NAME == 'linux-mipsle' && env.ASSET_NAME == 'linux-mips' && !cancelled()
+        if: steps.compile.outputs.status == 'success' && steps.get_filename.env.ASSET_NAME == 'linux-mipsle' && steps.get_filename.env.ASSET_NAME == 'linux-mips' && !cancelled()
         run: |
           cd Xray
           upx --lzma --best build_assets/xray || true
