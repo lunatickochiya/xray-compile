@@ -47,10 +47,6 @@ jobs:
             goarch: arm64
           # BEGIN MIPS
           - goos: linux
-            goarch: mips64
-          - goos: linux
-            goarch: mips64le
-          - goos: linux
             goarch: mipsle
           - goos: linux
             goarch: mips
@@ -98,7 +94,7 @@ jobs:
 
       - name: UPX
         id: upx
-        if: steps.compile.outputs.status == 'success' && $ASSET_NAME == 'linux-mipsle' && $ASSET_NAME == 'linux-mips' && !cancelled()
+        if: steps.compile.outputs.status == 'success' && !cancelled()
         run: |
           cd Xray
           upx --lzma --best build_assets/xray || true
