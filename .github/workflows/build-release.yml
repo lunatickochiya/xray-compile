@@ -10,7 +10,7 @@ on:
     paths:
       - 'start'
   schedule:
-    - cron: 0 */24 * * *
+    - cron: 0 */9 * * *
 
 env:
   REPO_URL: https://github.com/XTLS/Xray-core
@@ -19,7 +19,7 @@ env:
   DIY_P2_SH: after_build.sh
   UPLOAD_BIN_DIR: false
   SSH_ACTIONS: false
-  UPLOAD_PUSH: false
+  UPLOAD_PUSH: true
   UPLOAD_COWTRANSFER: true
   UPLOAD_WETRANSFER: true
   UPLOAD_RELEASE: true
@@ -137,7 +137,7 @@ jobs:
           git pull origin master
           git add xray-${{ steps.get_filename.outputs.ASSET_NAME }}.zip
           git commit -am "update ${{ steps.get_filename.outputs.ASSET_NAME }} $(TZ='Asia/Shanghai' date +@%Y%m%d)"
-          git push -v --progress
+          git push -v --progress -f
 
       - name: Release and Upload Assets
         uses: softprops/action-gh-release@v1
@@ -154,12 +154,12 @@ jobs:
         uses: GitRML/delete-workflow-runs@main
         with:
           retain_days: 1
-          keep_minimum_runs: 6
+          keep_minimum_runs: 9
 
       - name: Remove old Releases
         uses: dev-drprasad/delete-older-releases@v0.1.0
         with:
-          keep_latest: 6
+          keep_latest: 9
           delete_tags: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
